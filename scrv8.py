@@ -12,62 +12,44 @@ def load_image(image_path):
 
 # Function to perform multi-scale template matching and visualize intermediate steps
 def match_template(image, template, scale_range=(0.5, 1.5), step=0.05):
-    # Ensure both image and template are grayscale
-    if len(template.shape) > 2:  # If the template is not grayscale
+    if len(template.shape) > 2:  # Ensure template is grayscale
         template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     else:
         template_gray = template
-    
-    # Loop through the scale range and perform template matching
+
     for scale in np.arange(scale_range[0], scale_range[1], step):
         resized_template = cv2.resize(template_gray, (0, 0), fx=scale, fy=scale)
         if image.shape[0] < resized_template.shape[0] or image.shape[1] < resized_template.shape[1]:
-            # Skip the scaling if the template becomes larger than the input image
             continue
         result = cv2.matchTemplate(image, resized_template, cv2.TM_CCOEFF_NORMED)
         (_, max_val, _, max_loc) = cv2.minMaxLoc(result)
-        
-        # Visualize the template and the result at this scale
-        plt.figure(figsize=(10, 5))
-        
-        # Plot the original image
-        plt.subplot(1, 3, 1)
-        plt.title("Original Image")
-        plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        
-        # Plot the template being used at this scale
-        plt.subplot(1, 3, 2)
-        plt.title(f"Template (Scale {scale:.2f})")
-        plt.imshow(resized_template, cmap='gray')
 
-        # Plot the result of the template matching
-        plt.subplot(1, 3, 3)
-        plt.title("Template Matching Result")
-        plt.imshow(result, cmap='hot')
-        plt.colorbar()
-
-        plt.show()
-
-        # If a good match is found, return it
         if max_val > 0.8:  # Threshold for detection
             return True, max_val, max_loc, scale, resized_template
     return False, None, None, None, None
 
-# Dictionary for currency templates
+# Updated dictionary for currency templates with country inside each currency
 currency_templates = {
     'LKR': {
-        '5000': ['scr/5000SCR/Bird5000.jpg']  # Add actual template image paths here
+        'country': 'Sri Lanka',  # Each currency now has a country key
+        '5000': ['scr/5000SCR/Bird5000.jpg']
     },
     'USD': {
-        '1': ['scr/OneDollorSCR/OneDollorWashinton.jpg','scr/OneDollorSCR/OneDollorLetter.jpg']
+        'country': 'USA',  # Each currency now has a country key
+        '1': ['scr/OneDollorSCR/OneDollorWashinton.jpg', 'scr/OneDollorSCR/OneDollorLetter.jpg']
     }
-    # Add more currency templates here
 }
+
 # Function to detect currency note
 def detect_currency(note_image, currency_templates):
     original_image, gray_image = load_image(note_image)
-    for currency, notes in currency_templates.items():
-        for value, templates in notes.items():
+    
+    # Iterate over each currency (LKR, USD, etc.)
+    for currency, data in currency_templates.items():
+        country = data['country']  # Get the country from the 'country' key
+
+        # Iterate over all notes (excluding the 'country' key)
+        for value, templates in {k: v for k, v in data.items() if k != 'country'}.items():
             for template_path in templates:
                 if not os.path.exists(template_path):
                     print(f"Template {template_path} not found!")
@@ -81,7 +63,7 @@ def detect_currency(note_image, currency_templates):
                     bottom_right = (top_left[0] + w, top_left[1] + h)
                     detected_img = original_image.copy()
                     cv2.rectangle(detected_img, top_left, bottom_right, (0, 255, 0), 3)
-                    
+
                     # Plot the result
                     plt.figure(figsize=(10, 5))
                     plt.subplot(1, 2, 1)
@@ -93,9 +75,9 @@ def detect_currency(note_image, currency_templates):
                     plt.imshow(resized_template, cmap='gray')
 
                     plt.show()
-                    
-                    return currency, value
-    return None, None
+
+                    return country, currency, value  # Return the country, currency, and value
+    return None, None, None
 
 # Function to get the exchange rate for a given currency
 def get_exchange_rate(currency_code):
@@ -110,14 +92,14 @@ def get_exchange_rate(currency_code):
 
 # Function to process user-uploaded image
 def process_uploaded_image(user_image_path):
-    currency, value = detect_currency(user_image_path, currency_templates)
+    country, currency, value = detect_currency(user_image_path, currency_templates)
     if currency and value:
-        print(f"Detected: {currency} {value} note.")
-        
+        print(f"Detected: {currency} {value} note from {country}.")
+
         # Get exchange rate to LKR
         exchange_rate = get_exchange_rate(currency)
         if exchange_rate:
-            converted_value = float(value) * exchange_rate; 
+            converted_value = float(value) * exchange_rate
             print(f"Exchange Rate: 1 {currency} = {exchange_rate} LKR")
             print(f"Value in LKR: {converted_value} LKR")
         else:
@@ -126,5 +108,5 @@ def process_uploaded_image(user_image_path):
         print("No match found.")
 
 # Example usage
-user_image_path = 'scr\OneDollorSCR\OneDollor.jpg'  # Replace with actual uploaded image path
+user_image_path = 'res\original.jpg'  # Replace with actual uploaded image path
 process_uploaded_image(user_image_path)

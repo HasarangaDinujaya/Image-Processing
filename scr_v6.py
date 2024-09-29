@@ -26,6 +26,7 @@ currency_templates = {
     'LKR': {
         '5000': ['scr/5000SCR/Bird5000.jpg']  # Add actual template image paths here
     }
+    
 }
 
 # Function to check and detect the currency note
